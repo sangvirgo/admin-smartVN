@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { productsAPI } from "../services/api"
+import { productService } from "../services/api"
 import { AlertCircle, Loader, Plus, Trash2 } from "lucide-react"
 
 const ProductForm = ({ initialData, onSuccess }) => {
@@ -67,9 +67,9 @@ const ProductForm = ({ initialData, onSuccess }) => {
       }
 
       if (initialData) {
-        await productsAPI.update(initialData.id, submitData)
+        await productService.update(initialData.id, submitData)
       } else {
-        await productsAPI.create(submitData)
+        await productService.create(submitData)
       }
       setSuccess(true)
       setTimeout(() => onSuccess(), 1500)

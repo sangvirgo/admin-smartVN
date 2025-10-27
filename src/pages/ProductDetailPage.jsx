@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useParams, useNavigate } from "react-router-dom"
-import { productsAPI } from "../services/api"
+import { productService } from "../services/api"
 import ProductForm from "../components/ProductForm"
 import { AlertCircle, Loader, ArrowLeft } from "lucide-react"
 
@@ -16,7 +16,7 @@ const ProductDetailPage = () => {
   useEffect(() => {
     const fetchProduct = async () => {
       try {
-        const response = await productsAPI.getById(id)
+        const response = await productService.getById(id)
         setProduct(response.data)
       } catch (err) {
         setError(err.response?.data?.message || "Failed to load product")

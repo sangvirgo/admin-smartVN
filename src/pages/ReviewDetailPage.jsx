@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useParams, useNavigate } from "react-router-dom"
-import { reviewsAPI } from "../services/api"
+import { reviewService } from "../services/api"
 import { AlertCircle, Loader, ArrowLeft, Star, Check, X } from "lucide-react"
 import ReviewStatusBadge from "../components/ReviewStatusBadge"
 
@@ -18,7 +18,7 @@ const ReviewDetailPage = () => {
   useEffect(() => {
     const fetchReview = async () => {
       try {
-        const response = await reviewsAPI.getById(id)
+        const response = await reviewService.getById(id)
         setReview(response.data)
       } catch (err) {
         setError(err.response?.data?.message || "Failed to load review")
@@ -35,7 +35,7 @@ const ReviewDetailPage = () => {
     try {
       setUpdating(true)
       setActionError(null)
-      await reviewsAPI.updateStatus(id, "APPROVED")
+      await reviewService.updateStatus(id, "APPROVED")
       setReview((prev) => ({ ...prev, status: "APPROVED" }))
     } catch (err) {
       setActionError(err.response?.data?.message || "Failed to approve review")
@@ -48,7 +48,7 @@ const ReviewDetailPage = () => {
     try {
       setUpdating(true)
       setActionError(null)
-      await reviewsAPI.updateStatus(id, "REJECTED")
+      await reviewService.updateStatus(id, "REJECTED")
       setReview((prev) => ({ ...prev, status: "REJECTED" }))
     } catch (err) {
       setActionError(err.response?.data?.message || "Failed to reject review")

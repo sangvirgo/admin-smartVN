@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useParams, useNavigate } from "react-router-dom"
-import { usersAPI } from "../services/api"
+import { userService } from "../services/api"
 import UserForm from "../components/UserForm"
 import { AlertCircle, Loader, ArrowLeft } from "lucide-react"
 
@@ -16,7 +16,7 @@ const UserDetailPage = () => {
   useEffect(() => {
     const fetchUser = async () => {
       try {
-        const response = await usersAPI.getById(id)
+        const response = await userService.getById(id)
         setUser(response.data)
       } catch (err) {
         setError(err.response?.data?.message || "Failed to load user")

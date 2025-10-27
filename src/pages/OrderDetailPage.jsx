@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useParams, useNavigate } from "react-router-dom"
-import { ordersAPI } from "../services/api"
+import { orderService } from "../services/api"
 import { AlertCircle, Loader, ArrowLeft, CheckCircle, Clock, Truck, Package } from "lucide-react"
 import OrderStatusBadge from "../components/OrderStatusBadge"
 
@@ -18,7 +18,7 @@ const OrderDetailPage = () => {
   useEffect(() => {
     const fetchOrder = async () => {
       try {
-        const response = await ordersAPI.getById(id)
+        const response = await orderService.getById(id)
         setOrder(response.data)
         setNewStatus(response.data.status)
       } catch (err) {
@@ -37,7 +37,7 @@ const OrderDetailPage = () => {
 
     try {
       setUpdating(true)
-      await ordersAPI.updateStatus(id, newStatus)
+      await orderService.updateStatus(id, newStatus)
       setOrder((prev) => ({ ...prev, status: newStatus }))
     } catch (err) {
       setError(err.response?.data?.message || "Failed to update order status")

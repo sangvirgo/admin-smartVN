@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { usersAPI } from "../services/api"
+import { userService } from "../services/api"
 import { AlertCircle, Loader } from "lucide-react"
 
 const UserForm = ({ initialData, onSuccess }) => {
@@ -39,10 +39,10 @@ const UserForm = ({ initialData, onSuccess }) => {
         if (password) {
           updateData.password = password
         }
-        await usersAPI.update(initialData.id, updateData)
+        await userService.update(initialData.id, updateData)
       } else {
         // Create new user
-        await usersAPI.create(formData)
+        await userService.create(formData)
       }
       setSuccess(true)
       setTimeout(() => onSuccess(), 1500)
