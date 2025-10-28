@@ -59,7 +59,7 @@ export const authService = {
   login: (email, password) => {
     // Login endpoint is in user-service, not admin-service
     // You need to call: POST http://localhost:8081/api/v1/auth/login
-    const AUTH_BASE_URL = import.meta.env.VITE_AUTH_BASE_URL || "http://localhost:8081/api/v1/auth"
+    const AUTH_BASE_URL = import.meta.env.VITE_AUTH_BASE_URL || "http://localhost:8080/api/v1/auth"
     return axios.post(`${AUTH_BASE_URL}/login`, { email, password })
   },
 }

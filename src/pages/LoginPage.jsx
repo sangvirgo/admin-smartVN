@@ -81,7 +81,7 @@ const LoginPage = () => {
             </button>
           </form>
 
-          <p className="text-center text-gray-600 text-sm mt-6">Demo credentials: admin@example.com / password123</p>
+          {/* <p className="text-center text-gray-600 text-sm mt-6">Demo credentials: admin@example.com / password123</p> */}
         </div>
       </div>
     </div>
