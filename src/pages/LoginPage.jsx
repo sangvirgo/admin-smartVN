@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom"
 import { useAuth } from "../context/AuthContext"
 import { authService } from "../services/api"
 import { AlertCircle, Loader } from "lucide-react"
+import axiosInstance from "../services/axios" // Thêm dòng này
 
 const LoginPage = () => {
   const [email, setEmail] = useState("")
@@ -14,23 +15,31 @@ const LoginPage = () => {
   const { login } = useAuth()
   const navigate = useNavigate()
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    setError("")
-    setLoading(true)
+const handleSubmit = async (e) => {
+  e.preventDefault()
+  setError("")
+  setLoading(true)
 
-    try {
-      const response = await authService.login(email, password)
-      const { user, token } = response.data
-
-      login(user, token)
-      navigate("/dashboard")
-    } catch (err) {
-      setError(err.response?.data?.message || "Login failed. Please try again.")
-    } finally {
-      setLoading(false)
-    }
+  try {
+    const response = await axiosInstance.post("/login", {
+      email,
+      password,
+    })
+    
+    const { accessToken, user } = response.data.data
+    
+    // Lưu token với key giống Customer
+    localStorage.setItem("accessToken", accessToken) 
+    localStorage.setItem("user", JSON.stringify(user))
+    
+    login(user, accessToken)
+    navigate("/dashboard")
+  } catch (err) {
+    setError(err.message || "Login failed. Please try again.")
+  } finally {
+    setLoading(false)
   }
+}
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center p-4">
