@@ -83,7 +83,7 @@ const UsersPage = () => {
           <h1 className="text-3xl font-bold text-gray-900">Users</h1>
           <p className="text-gray-600 mt-1">Manage system users and their roles</p>
         </div>
-        {isAdmin && (
+        {/* {isAdmin && (
           <button
             onClick={() => navigate("/users/create")}
             className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
@@ -91,7 +91,7 @@ const UsersPage = () => {
             <Plus size={20} />
             Add User
           </button>
-        )}
+        )} */}
       </div>
 
       {/* Filters */}
@@ -115,6 +115,7 @@ const UsersPage = () => {
             <option value="ALL">All Roles</option>
             <option value="ADMIN">Admin</option>
             <option value="STAFF">Staff</option>
+            <option value="CUSTOMER">Customer</option>
           </select>
         </div>
       </div>

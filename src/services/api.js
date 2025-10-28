@@ -163,6 +163,20 @@ export const userService = {
  * Product Service
  */
 export const productService = {
+/**
+   * Get all product categories
+   * @returns {Promise} List of categories
+   */
+  // SỬA: Dùng axios.get() trực tiếp với URL đầy đủ
+  getCategories: () => {
+    const categoriesUrl = "http://localhost:8080/api/v1/categories";
+    // Lấy token từ localStorage để gửi kèm (nếu API categories yêu cầu xác thực)
+    const token = localStorage.getItem("accessToken");
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+    return axios.get(categoriesUrl, { headers });
+  },
+
+
   /**
    * Get all products with pagination and filters
    * @param {number} page - Page number (0-indexed)

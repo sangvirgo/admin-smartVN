@@ -2,56 +2,134 @@
 
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
+// SỬA: Import cả getCategories
 import { productService } from "../services/api"
-import { AlertCircle, Loader, Plus, Search, Trash2, Edit2 } from "lucide-react"
+import { AlertCircle, Loader, Plus, Search, Trash2, Edit2, Star, ImageOff } from "lucide-react"
 import { useAuth } from "../context/AuthContext"
 
+// --- Tiện ích --- (Giữ nguyên các hàm formatCurrency, formatDate, renderStars)
+const formatCurrency = (value) => {
+    if (value === null || value === undefined) {
+      return "N/A"
+    }
+    return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(value)
+  }
+  
+  const formatDate = (dateString) => {
+    if (!dateString) return "N/A"
+    try {
+      return new Date(dateString).toLocaleDateString("vi-VN", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      })
+    } catch (e) {
+      return "Invalid Date"
+    }
+  }
+  
+  const renderStars = (rating) => {
+    const roundedRating = Math.round(rating * 2) / 2 // Làm tròn đến 0.5
+    return (
+      <div className="flex gap-0.5">
+        {[...Array(5)].map((_, i) => (
+          <Star
+            key={i}
+            size={16}
+            className={i < roundedRating ? "fill-yellow-400 text-yellow-400" : "text-gray-300"}
+          />
+        ))}
+      </div>
+    )
+  }
+
+// --- Component ---
 const ProductsPage = () => {
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [categoryFilter, setCategoryFilter] = useState("ALL")
+  // SỬA: Thêm state cho categories và activeFilter
+  const [categories, setCategories] = useState([])
+  const [activeFilter, setActiveFilter] = useState("ALL") // "ALL", "ACTIVE", "INACTIVE"
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [deleting, setDeleting] = useState(null)
   const navigate = useNavigate()
   const { isAdmin } = useAuth()
 
+  // SỬA: Hàm fetch categories
+  const fetchCategories = async () => {
+    try {
+      const response = await productService.getCategories()
+      // Giả định response.data.data là mảng categories từ API của bạn
+      setCategories(response.data?.data || [])
+      console.log('Categories', response.data?.data || [])
+    } catch (err) {
+      console.error("Failed to load categories:", err)
+      setError("Không thể tải danh mục sản phẩm.")
+      setCategories([]) // Set mảng rỗng nếu lỗi
+    }
+  }
+
+  // SỬA: Hàm fetch products để nhận thêm activeFilter
   const fetchProducts = async (pageNum = 1) => {
     try {
       setLoading(true)
+      setError(null)
+
+      // Xử lý giá trị boolean cho isActive
+      let isActiveParam = null
+      if (activeFilter === "ACTIVE") {
+        isActiveParam = true
+      } else if (activeFilter === "INACTIVE") {
+        isActiveParam = false
+      }
+
       const response = await productService.getProducts(
         pageNum - 1,
         10,
         searchTerm,
-        categoryFilter !== "ALL" ? categoryFilter : null,
-        null,
+        categoryFilter !== "ALL" ? categoryFilter : null, // Gửi categoryId dạng số
+        isActiveParam, // Gửi true/false/null
       )
-      setProducts(response.data.content || response.data.data || [])
-      setTotalPages(response.data.totalPages || response.data.pagination?.totalPages || 1)
+
+      const productData = response.data?.content || response.data?.data || []
+      setProducts(productData)
+      setTotalPages(response.data?.totalPages || response.data?.pagination?.totalPages || 1)
       setPage(pageNum)
     } catch (err) {
-      setError(err.response?.data?.message || "Failed to load products")
+      setError(err.response?.data?.message || err.message || "Không thể tải danh sách sản phẩm.")
       console.error("Products error:", err)
+      setProducts([])
     } finally {
       setLoading(false)
     }
   }
 
+  // SỬA: Fetch categories khi component mount
   useEffect(() => {
-    fetchProducts(1)
-  }, [searchTerm, categoryFilter])
+    fetchCategories()
+  }, [])
 
+  // SỬA: Fetch products khi filter thay đổi
+  useEffect(() => {
+    fetchProducts(1) // Reset về trang 1 khi filter
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchTerm, categoryFilter, activeFilter])
+
+  // --- Giữ nguyên các hàm handleDelete, handleEdit, getLowestPrice, getTotalStock ---
   const handleDelete = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this product?")) return
+    if (!window.confirm("Bạn có chắc chắn muốn xóa sản phẩm này không?")) return
 
     try {
       setDeleting(id)
+      setError(null)
       await productService.deleteProduct(id)
-      setProducts(products.filter((p) => p.id !== id))
+      fetchProducts(page) // Fetch lại trang hiện tại
     } catch (err) {
-      setError(err.response?.data?.message || "Failed to delete product")
+      setError(err.response?.data?.message || err.message || "Xóa sản phẩm thất bại")
     } finally {
       setDeleting(null)
     }
@@ -61,27 +139,25 @@ const ProductsPage = () => {
     navigate(`/products/${id}`)
   }
 
-  if (error && !loading) {
-    return (
-      <div className="p-6">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex gap-3">
-          <AlertCircle size={20} className="text-red-600 flex-shrink-0" />
-          <div>
-            <h3 className="font-medium text-red-900">Error Loading Products</h3>
-            <p className="text-red-700 text-sm mt-1">{error}</p>
-          </div>
-        </div>
-      </div>
-    )
+  const getLowestPrice = (inventories) => {
+    if (!inventories || inventories.length === 0) return 0
+    const prices = inventories.map((inv) => inv.discountedPrice ?? inv.price)
+    return Math.min(...prices)
   }
+
+  const getTotalStock = (inventories) => {
+    if (!inventories) return 0
+    return inventories.reduce((sum, inv) => sum + (inv.quantity || 0), 0)
+  }
+  // ---
 
   return (
     <div className="space-y-6">
-      {/* Page Header */}
+      {/* Page Header (giữ nguyên) */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Products</h1>
-          <p className="text-gray-600 mt-1">Manage your product catalog</p>
+          <h1 className="text-3xl font-bold text-gray-900">Sản phẩm</h1>
+          <p className="text-gray-600 mt-1">Quản lý danh mục sản phẩm của bạn</p>
         </div>
         {isAdmin && (
           <button
@@ -89,47 +165,75 @@ const ProductsPage = () => {
             className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
           >
             <Plus size={20} />
-            Add Product
+            Thêm sản phẩm
           </button>
         )}
       </div>
 
+      {/* Thông báo lỗi (giữ nguyên) */}
+      {error && (
+         <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex gap-3">
+           <AlertCircle size={20} className="text-red-600 flex-shrink-0" />
+           <p className="text-red-700 text-sm">{error}</p>
+         </div>
+       )}
+
       {/* Filters */}
       <div className="bg-white rounded-lg shadow p-4 space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* SỬA: grid-cols-3 để thêm bộ lọc trạng thái */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Search Input (giữ nguyên) */}
           <div className="relative">
             <Search size={18} className="absolute left-3 top-3 text-gray-400" />
             <input
               type="text"
-              placeholder="Search by name or SKU..."
+              placeholder="Tìm theo tên sản phẩm..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none"
             />
           </div>
+
+          {/* SỬA: Category Filter - Lấy dữ liệu động */}
           <select
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
             className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none"
+            disabled={categories.length === 0} // Disable nếu chưa load xong categories
           >
-            <option value="ALL">All Categories</option>
-            <option value="ELECTRONICS">Electronics</option>
-            <option value="CLOTHING">Clothing</option>
-            <option value="BOOKS">Books</option>
-            <option value="HOME">Home & Garden</option>
+            <option value="ALL">Tất cả danh mục</option>
+            {/* Lặp qua danh sách categories */}
+            {categories.map((category) => (
+              // Sử dụng categoryId làm value
+              <option key={category.categoryId} value={category.categoryId}>
+                {category.name}
+              </option>
+            ))}
+          </select>
+
+          {/* SỬA: Thêm Active Filter */}
+          <select
+            value={activeFilter}
+            onChange={(e) => setActiveFilter(e.target.value)}
+            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none"
+          >
+            <option value="ALL">Tất cả trạng thái</option>
+            <option value="ACTIVE">Hoạt động</option>
+            <option value="INACTIVE">Ngừng</option>
           </select>
         </div>
       </div>
 
-      {/* Products Grid */}
+      {/* Products Table (giữ nguyên cấu trúc HTML, chỉ sửa nội dung bên trong) */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center h-64">
             <Loader size={24} className="animate-spin text-blue-600" />
+            <p className="ml-2 text-gray-600">Đang tải sản phẩm...</p>
           </div>
         ) : products.length === 0 ? (
           <div className="p-8 text-center">
-            <p className="text-gray-500">No products found</p>
+            <p className="text-gray-500">Không tìm thấy sản phẩm nào.</p>
           </div>
         ) : (
           <>
@@ -137,56 +241,81 @@ const ProductsPage = () => {
               <table className="w-full">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Name</th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">SKU</th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Category</th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Price</th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Stock</th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Status</th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Actions</th>
+                    {/* Giữ nguyên các th */}
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Sản phẩm</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Thương hiệu</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Danh mục</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Giá từ</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Tồn kho</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Đã bán</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Đánh giá</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Trạng thái</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Ngày tạo</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Hành động</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {products.map((product) => (
+                  {/* Giữ nguyên map và các td, đảm bảo truy cập đúng thuộc tính */}
+                   {products.map((product) => (
                     <tr key={product.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4 text-sm font-medium text-gray-900">{product.name}</td>
-                      <td className="px-6 py-4 text-sm text-gray-600">{product.sku}</td>
-                      <td className="px-6 py-4 text-sm text-gray-600">{product.category}</td>
-                      <td className="px-6 py-4 text-sm font-medium text-gray-900">${product.price.toFixed(2)}</td>
-                      <td className="px-6 py-4 text-sm">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center gap-3">
+                          <div className="flex-shrink-0 h-10 w-10">
+                            {product.imageUrl ? (
+                              <img
+                                className="h-10 w-10 rounded-md object-cover"
+                                src={product.imageUrl}
+                                alt={product.title || 'Product image'}
+                                onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }} // Hide img on error
+                              />
+                            ) : null}
+                            <div className={`h-10 w-10 rounded-md bg-gray-100 items-center justify-center ${product.imageUrl ? 'hidden' : 'flex'}`}>
+                                <ImageOff size={20} className="text-gray-400" />
+                            </div>
+                          </div>
+                          <div className="text-sm font-medium text-gray-900 truncate" style={{maxWidth: '200px'}}>{product.title || 'N/A'}</div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{product.brand || 'N/A'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{product.categoryName || 'N/A'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{formatCurrency(getLowestPrice(product.inventories))}</td>
+                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                        {getTotalStock(product.inventories)}
+                       </td>
+                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{product.quantitySold || 0}</td>
+                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                        <div className='flex items-center gap-1'>
+                            {renderStars(product.averageRating || 0)}
+                            <span>({product.numRatings || 0})</span>
+                        </div>
+                       </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        {/* SỬA: Dùng product.active */}
                         <span
-                          className={`px-3 py-1 rounded-full text-xs font-medium ${
-                            product.stock > 0 ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+                          className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                            product.active ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
                           }`}
                         >
-                          {product.stock} units
+                          {product.active ? "Hoạt động" : "Ngừng"}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-sm">
-                        <span
-                          className={`px-3 py-1 rounded-full text-xs font-medium ${
-                            product.isActive ? "bg-blue-100 text-blue-800" : "bg-gray-100 text-gray-800"
-                          }`}
-                        >
-                          {product.isActive ? "Active" : "Inactive"}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-sm">
+                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{formatDate(product.createdAt)}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <div className="flex items-center gap-2">
                           {isAdmin && (
                             <>
                               <button
                                 onClick={() => handleEdit(product.id)}
-                                className="p-2 hover:bg-blue-100 rounded-lg transition-colors text-blue-600"
-                                title="Edit product"
+                                className="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-100 rounded transition-colors"
+                                title="Chỉnh sửa"
                               >
                                 <Edit2 size={18} />
                               </button>
                               <button
                                 onClick={() => handleDelete(product.id)}
                                 disabled={deleting === product.id}
-                                className="p-2 hover:bg-red-100 rounded-lg transition-colors text-red-600 disabled:opacity-50"
-                                title="Delete product"
+                                className="p-1 text-red-600 hover:text-red-800 hover:bg-red-100 rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                title="Xóa"
                               >
                                 {deleting === product.id ? (
                                   <Loader size={18} className="animate-spin" />
@@ -196,6 +325,7 @@ const ProductsPage = () => {
                               </button>
                             </>
                           )}
+                           {!isAdmin && <span className="text-xs text-gray-400 italic">N/A</span>}
                         </div>
                       </td>
                     </tr>
@@ -204,26 +334,26 @@ const ProductsPage = () => {
               </table>
             </div>
 
-            {/* Pagination */}
-            {totalPages > 1 && (
+            {/* Pagination (giữ nguyên) */}
+             {totalPages > 1 && (
               <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
                 <p className="text-sm text-gray-600">
-                  Page {page} of {totalPages}
+                  Trang {page} / {totalPages}
                 </p>
                 <div className="flex gap-2">
                   <button
                     onClick={() => fetchProducts(page - 1)}
-                    disabled={page === 1}
-                    className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                    disabled={page === 1 || loading}
+                    className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
-                    Previous
+                    Trước
                   </button>
                   <button
                     onClick={() => fetchProducts(page + 1)}
-                    disabled={page === totalPages}
-                    className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                    disabled={page === totalPages || loading}
+                    className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
-                    Next
+                    Sau
                   </button>
                 </div>
               </div>

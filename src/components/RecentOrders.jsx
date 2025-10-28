@@ -68,7 +68,10 @@ const RecentOrders = () => {
             <div key={order.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
               <div>
                 <p className="font-medium text-gray-900">Order #{order.id}</p>
-                <p className="text-sm text-gray-600">${order.total.toFixed(2)}</p>
+                {/* SỬA: Thêm '?? 0' để cung cấp giá trị dự phòng
+                  nếu 'order.total' là null hoặc undefined 
+                */}
+                <p className="text-sm text-gray-600">${(order.total ?? 0).toFixed(2)}</p>
               </div>
               <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
                 {order.status}
