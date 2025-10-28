@@ -22,8 +22,9 @@ const DashboardPage = () => {
           dashboardService.getOverview(),
           dashboardService.getRevenueChart(),
         ])
-        setStats(statsRes.data)
-        setChartData(chartRes.data)
+        setStats(statsRes.data.data)
+        console.log('statsRes.data', statsRes.data.data)
+        setChartData(chartRes.data.data)
       } catch (err) {
         setError(err.response?.data?.message || "Failed to load dashboard data")
         console.error("Dashboard error:", err)
