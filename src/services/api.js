@@ -230,7 +230,13 @@ export const productService = {
    * @param {Object} data - Inventory data { size, quantity, price, discountPercent }
    * @returns {Promise} Inventory response
    */
-  addInventory: (productId, data) => api.post(`/products/${productId}/inventory`, data),
+// Inventory operations
+  addInventory: (productId, data) => {
+    // Đảm bảo gửi JSON thuần túy, không FormData
+    return api.post(`/products/${productId}/inventory`, data, {
+      headers: { "Content-Type": "application/json" }
+    })
+  },
 
   /**
    * Update product inventory
@@ -239,28 +245,30 @@ export const productService = {
    * @param {Object} data - Updated inventory data
    * @returns {Promise} Updated inventory
    */
-  updateInventory: (productId, inventoryId, data) => api.put(`/products/${productId}/inventory/${inventoryId}`, data),
-
+updateInventory: (productId, inventoryId, data) => {
+  // Đảm bảo gửi JSON thuần túy
+  return api.put(`/products/${productId}/inventory/${inventoryId}`, data, {
+    headers: { "Content-Type": "application/json" }
+  })
+},
   /**
    * Upload product image
    * @param {number} productId - Product ID
    * @param {File} file - Image file
    * @returns {Promise} Upload response with image URL
    */
-  uploadImage: (productId, file) => {
-    const formData = new FormData()
-    formData.append("file", file)
-    return api.post(`/products/${productId}/images`, formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    })
-  },
+// Image operations (THÊM MỚI nếu chưa có hoặc SỬA LẠI)
+uploadImage: (productId, file) => {
+  const formData = new FormData()
+  formData.append("file", file)
+  return api.post(`/products/${productId}/images`, formData, {
+    headers: { "Content-Type": "multipart/form-data" }
+  })
+},
 
-  /**
-   * Delete product image
-   * @param {number} imageId - Image ID
-   * @returns {Promise} Delete response
-   */
-  deleteImage: (imageId) => api.delete(`/products/images/${imageId}`),
+deleteImage: (imageId) => {
+  return api.delete(`/products/images/${imageId}`)
+},
 }
 
 /**

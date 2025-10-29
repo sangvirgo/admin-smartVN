@@ -1,5 +1,5 @@
 "use client"
-
+import { CheckCircle, XCircle } from "lucide-react"
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 // SỬA: Import cả getCategories
@@ -134,6 +134,17 @@ const ProductsPage = () => {
       setDeleting(null)
     }
   }
+
+  const handleToggleActive = async (id, currentStatus) => {
+  try {
+    setError(null)
+    await productService.toggleActive(id)
+    // Refresh products sau khi toggle
+    fetchProducts(page)
+  } catch (err) {
+    setError(err.response?.data?.message || err.message || "Không thể thay đổi trạng thái")
+  }
+}
 
   const handleEdit = (id) => {
     navigate(`/products/${id}`)
@@ -300,10 +311,25 @@ const ProductsPage = () => {
                         </span>
                       </td>
                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{formatDate(product.createdAt)}</td>
+
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <div className="flex items-center gap-2">
                           {isAdmin && (
                             <>
+                              {/* Toggle Active Button */}
+                              <button
+                                onClick={() => handleToggleActive(product.id, product.active)}
+                                className={`p-1 rounded transition-colors ${
+                                  product.active 
+                                    ? 'text-orange-600 hover:text-orange-800 hover:bg-orange-100' 
+                                    : 'text-green-600 hover:text-green-800 hover:bg-green-100'
+                                }`}
+                                title={product.active ? "Tắt sản phẩm" : "Bật sản phẩm"}
+                              >
+                                {product.active ? <XCircle size={18} /> : <CheckCircle size={18} />}
+                              </button>
+
+                              {/* Edit Button */}
                               <button
                                 onClick={() => handleEdit(product.id)}
                                 className="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-100 rounded transition-colors"
@@ -311,6 +337,8 @@ const ProductsPage = () => {
                               >
                                 <Edit2 size={18} />
                               </button>
+
+                              {/* Delete Button */}
                               <button
                                 onClick={() => handleDelete(product.id)}
                                 disabled={deleting === product.id}
@@ -325,9 +353,10 @@ const ProductsPage = () => {
                               </button>
                             </>
                           )}
-                           {!isAdmin && <span className="text-xs text-gray-400 italic">N/A</span>}
+                          {!isAdmin && <span className="text-xs text-gray-400 italic">N/A</span>}
                         </div>
                       </td>
+
                     </tr>
                   ))}
                 </tbody>

@@ -1,22 +1,18 @@
-"use client"
-
 import { useState, useEffect } from "react"
+import { useNavigate } from "react-router-dom"
 import { productService } from "../services/api"
-import { AlertCircle, Loader, Plus } from "lucide-react" // Xóa Trash2 khỏi import
+import { AlertCircle, Loader, Plus, X, Upload, Trash2, Check } from "lucide-react"
 
-// --- Tiện ích ---
-const formatCurrency = (value) => {
-    const numValue = Number(value);
-    if (isNaN(numValue)) return "0";
-    return String(numValue);
-};
+const ProductForm = ({ initialData = null, onSuccess, onCancel }) => {
+  const navigate = useNavigate()
+  const isEditMode = !!initialData
 
-const ProductForm = ({ initialData, onSuccess, onCancel }) => {
-  // Khởi tạo state không có categoryId
+  // Form states
   const [formData, setFormData] = useState({
     title: "",
-    brand: "",
     description: "",
+    brand: "",
+    categoryId: "",
     color: "",
     weight: "",
     dimension: "",
@@ -28,20 +24,39 @@ const ProductForm = ({ initialData, onSuccess, onCancel }) => {
     connectionPort: "",
     detailedReview: "",
     powerfulPerformance: "",
-    active: true,
-    inventories: [],
-    images: [],
   })
-  const [error, setError] = useState(null)
+
+  const [inventories, setInventories] = useState([])
+  const [categories, setCategories] = useState([])
+  const [existingImages, setExistingImages] = useState([])
+  const [newImageFiles, setNewImageFiles] = useState([])
+  const [imagesToDelete, setImagesToDelete] = useState([])
+  
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
   const [success, setSuccess] = useState(false)
 
+  // Load categories
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await productService.getCategories()
+        setCategories(response.data?.data || [])
+      } catch (err) {
+        console.error("Failed to load categories:", err)
+      }
+    }
+    fetchCategories()
+  }, [])
+
+  // Load initial data for edit mode
   useEffect(() => {
     if (initialData) {
       setFormData({
         title: initialData.title || "",
-        brand: initialData.brand || "",
         description: initialData.description || "",
+        brand: initialData.brand || "",
+        categoryId: initialData.categoryId || "",
         color: initialData.color || "",
         weight: initialData.weight || "",
         dimension: initialData.dimension || "",
@@ -53,125 +68,123 @@ const ProductForm = ({ initialData, onSuccess, onCancel }) => {
         connectionPort: initialData.connectionPort || "",
         detailedReview: initialData.detailedReview || "",
         powerfulPerformance: initialData.powerfulPerformance || "",
-        active: initialData.active !== undefined ? initialData.active : true,
-        // Đảm bảo inventories là một mảng, ngay cả khi API trả về null
-        inventories: Array.isArray(initialData.inventories) ? initialData.inventories : [],
-        images: initialData.images || [],
       })
+      setInventories(initialData.inventories?.map(inv => ({
+        id: inv.id,
+        size: inv.size || "",
+        quantity: inv.quantity || 0,
+        price: inv.price || 0,
+        discountPercent: inv.discountPercent || 0,
+        isExisting: true
+      })) || [])
+      setExistingImages(initialData.images || [])
     }
   }, [initialData])
 
-  const handleChange = (e) => {
-    const { name, value, type, checked } = e.target
-    setFormData((prev) => ({
-      ...prev,
-      [name]: type === "checkbox" ? checked : value,
-    }))
+  const handleInputChange = (e) => {
+    const { name, value } = e.target
+    setFormData(prev => ({ ...prev, [name]: value }))
   }
 
-  // --- Các hàm xử lý inventories ---
-  const handleAddInventory = () => {
-    setFormData((prev) => ({
-      ...prev,
-      inventories: [...(prev.inventories || []), { size: "", quantity: '', price: '', discountPercent: '' }], // Khởi tạo giá trị số là chuỗi rỗng
-    }))
+  // Inventory handlers
+  const addInventory = () => {
+    setInventories([...inventories, { 
+      size: "", 
+      quantity: 0, 
+      price: 0, 
+      discountPercent: 0,
+      isExisting: false 
+    }])
   }
 
-  // Xóa hàm handleRemoveInventory vì không còn nút xóa
-  // const handleRemoveInventory = (index) => { ... }
+  const updateInventory = (index, field, value) => {
+    const updated = [...inventories]
+    updated[index][field] = field === 'size' ? value : Number(value) || 0
+    setInventories(updated)
+  }
 
-  const handleInventoryChange = (index, field, value) => {
-     let processedValue = value;
-     if (field === 'quantity' || field === 'price' || field === 'discountPercent') {
-         processedValue = value; // Giữ nguyên là chuỗi để cho phép xóa
-     } else if (field === 'size') {
-         processedValue = String(value);
-     }
+  // Image handlers
+  const handleImageUpload = (e) => {
+    const files = Array.from(e.target.files)
+    setNewImageFiles(prev => [...prev, ...files])
+  }
 
-     setFormData((prev) => {
-        // Đảm bảo inventories luôn là mảng
-        const currentInventories = Array.isArray(prev.inventories) ? prev.inventories : [];
-        return {
-            ...prev,
-            inventories: currentInventories.map((inv, i) =>
-                i === index ? { ...inv, [field]: processedValue } : inv
-            ),
-        };
-     });
-   }
-  // ---
+  const removeNewImage = (index) => {
+    setNewImageFiles(prev => prev.filter((_, i) => i !== index))
+  }
 
+  const markImageForDeletion = (imageId) => {
+    if (!imagesToDelete.includes(imageId)) {
+      setImagesToDelete(prev => [...prev, imageId])
+    }
+  }
+
+  const unmarkImageForDeletion = (imageId) => {
+    setImagesToDelete(prev => prev.filter(id => id !== imageId))
+  }
+
+  // Submit handler
   const handleSubmit = async (e) => {
     e.preventDefault()
-    setError(null)
-    setSuccess(false)
     setLoading(true)
+    setError(null)
 
     try {
-        // Chuẩn bị dữ liệu inventories để gửi đi
-        const processedInventories = (formData.inventories || []).map(inv => {
-            const quantity = inv.quantity === '' || isNaN(Number(inv.quantity)) ? 0 : Number(inv.quantity);
-            const price = inv.price === '' || isNaN(Number(inv.price)) ? 0 : Number(inv.price);
-            const discountPercent = inv.discountPercent === '' || isNaN(Number(inv.discountPercent)) ? 0 : Number(inv.discountPercent);
+      let productId = initialData?.id
 
-            // Chỉ bao gồm id nếu nó tồn tại (cho update)
-            const inventoryPayload = {
-                size: String(inv.size || ''), // Đảm bảo size là chuỗi
-                quantity: quantity,
-                price: price,
-                discountPercent: discountPercent,
-            };
-            if (inv.id) {
-                inventoryPayload.id = inv.id;
-            }
-            return inventoryPayload;
-        });
-
-
-        // Dữ liệu cuối cùng để gửi
-        const submitData = {
-          ...formData, // Lấy các trường thông tin sản phẩm khác
-          inventories: processedInventories, // Sử dụng inventories đã xử lý
-        };
-
-         // Loại bỏ các trường không cần thiết khác nếu có (ví dụ: images nếu backend không xử lý)
-         delete submitData.images;
-
-
-      if (initialData?.id) {
-        // Gọi API updateProduct với toàn bộ thông tin sản phẩm và inventories
-        await productService.updateProduct(initialData.id, submitData)
+      // Step 1: Create/Update product
+      if (isEditMode) {
+        await productService.updateProduct(productId, formData)
       } else {
-        // Gọi API createProduct
-        // Khi tạo mới, backend sẽ bỏ qua 'id' trong inventories nếu có
-        await productService.createProduct(submitData)
-      }
-      setSuccess(true)
-       setTimeout(() => {
-            if (onSuccess) onSuccess();
-        }, 1500);
-    } catch (err) {
-      // Cố gắng hiển thị lỗi cụ thể hơn từ backend nếu có
-      let errorMessage = "Lưu sản phẩm thất bại";
-      if (err.response?.data) {
-          if (typeof err.response.data === 'string') {
-              errorMessage = err.response.data;
-          } else if (err.response.data.message) {
-              errorMessage = err.response.data.message;
-          } else if (err.response.data.error) {
-               errorMessage = err.response.data.error;
-          }
-          // Check for validation errors (nếu backend trả về dạng object)
-          else if (typeof err.response.data === 'object') {
-             const validationErrors = Object.values(err.response.data).flat().join(', ');
-             if (validationErrors) errorMessage += `: ${validationErrors}`;
-          }
-      } else if (err.message) {
-          errorMessage = err.message;
+        const response = await productService.createProduct(formData)
+        productId = response.data?.data?.id || response.data?.id
       }
 
-      setError(errorMessage);
-      console.error("Form error:", err.response || err);
+      if (!productId) {
+        throw new Error("Không lấy được Product ID")
+      }
+
+      // Step 2: Handle inventories
+      for (const inv of inventories) {
+        const invData = {
+          size: inv.size,
+          quantity: inv.quantity,
+          price: inv.price,
+          discountPercent: inv.discountPercent
+        }
+
+        if (inv.isExisting && inv.id) {
+          // Update existing inventory
+          await productService.updateInventory(productId, inv.id, invData)
+        } else {
+          // Add new inventory
+          await productService.addInventory(productId, invData)
+        }
+      }
+
+      // Step 3: Delete marked images
+      for (const imageId of imagesToDelete) {
+        await productService.deleteImage(imageId)
+      }
+
+      // Step 4: Upload new images
+      for (const file of newImageFiles) {
+        await productService.uploadImage(productId, file)
+      }
+
+      setSuccess(true)
+      setTimeout(() => {
+        if (onSuccess) {
+          onSuccess()
+        } else {
+          navigate("/products")
+        }
+      }, 1500)
+
+    } catch (err) {
+      const errorMsg = err.response?.data?.message || err.message || "Có lỗi xảy ra"
+      setError(errorMsg)
+      console.error("Form submission error:", err)
     } finally {
       setLoading(false)
     }
@@ -179,174 +192,418 @@ const ProductForm = ({ initialData, onSuccess, onCancel }) => {
 
   return (
     <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow p-6 space-y-6">
-      {/* Messages Error/Success */}
+      {/* Error Alert */}
       {error && (
-        <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex gap-3">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex gap-3">
           <AlertCircle size={20} className="text-red-600 flex-shrink-0" />
           <p className="text-red-700 text-sm">{error}</p>
         </div>
       )}
+
+      {/* Success Alert */}
       {success && (
-        <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-          <p className="text-green-700 text-sm">Sản phẩm đã được lưu!</p>
+        <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex gap-3">
+          <Check size={20} className="text-green-600 flex-shrink-0" />
+          <p className="text-green-700 text-sm">
+            {isEditMode ? "Cập nhật thành công!" : "Tạo sản phẩm thành công!"}
+          </p>
         </div>
       )}
 
-      {/* Basic Information */}
-      <div>
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Thông tin cơ bản</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <InputField label="Tên sản phẩm" name="title" value={formData.title} onChange={handleChange} required placeholder="Tên sản phẩm"/>
-          <InputField label="Thương hiệu" name="brand" value={formData.brand} onChange={handleChange} placeholder="Thương hiệu"/>
-          <div className="md:col-span-2">
-            <TextareaField label="Mô tả" name="description" value={formData.description} onChange={handleChange} placeholder="Mô tả sản phẩm"/>
+      {/* Basic Info */}
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold text-gray-900">Thông tin cơ bản</h3>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Tên sản phẩm <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              name="title"
+              value={formData.title}
+              onChange={handleInputChange}
+              required
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Thương hiệu <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              name="brand"
+              value={formData.brand}
+              onChange={handleInputChange}
+              required
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+            />
+          </div>
+
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Màu sắc</label>
+            <input
+              type="text"
+              name="color"
+              value={formData.color}
+              onChange={handleInputChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Mô tả</label>
+          <textarea
+            name="description"
+            value={formData.description}
+            onChange={handleInputChange}
+            rows={3}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+          />
+        </div>
+      </div>
+
+      {/* Technical Specs */}
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold text-gray-900">Thông số kỹ thuật</h3>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Trọng lượng</label>
+            <input
+              type="text"
+              name="weight"
+              value={formData.weight}
+              onChange={handleInputChange}
+              placeholder="VD: 200g"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Kích thước</label>
+            <input
+              type="text"
+              name="dimension"
+              value={formData.dimension}
+              onChange={handleInputChange}
+              placeholder="VD: 160x75x8mm"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Màn hình</label>
+            <input
+              type="text"
+              name="screenSize"
+              value={formData.screenSize}
+              onChange={handleInputChange}
+              placeholder="VD: 6.5 inch"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">RAM</label>
+            <input
+              type="text"
+              name="ramCapacity"
+              value={formData.ramCapacity}
+              onChange={handleInputChange}
+              placeholder="VD: 8GB"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Bộ nhớ</label>
+            <input
+              type="text"
+              name="romCapacity"
+              value={formData.romCapacity}
+              onChange={handleInputChange}
+              placeholder="VD: 256GB"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Loại Pin</label>
+            <input
+              type="text"
+              name="batteryType"
+              value={formData.batteryType}
+              onChange={handleInputChange}
+              placeholder="VD: Li-Po"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Dung lượng Pin</label>
+            <input
+              type="text"
+              name="batteryCapacity"
+              value={formData.batteryCapacity}
+              onChange={handleInputChange}
+              placeholder="VD: 5000mAh"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Cổng kết nối</label>
+            <input
+              type="text"
+              name="connectionPort"
+              value={formData.connectionPort}
+              onChange={handleInputChange}
+              placeholder="VD: USB-C"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+            />
           </div>
         </div>
       </div>
 
-       {/* Specifications */}
-       <div>
-         <h2 className="text-lg font-semibold text-gray-900 mb-4">Thông số kỹ thuật</h2>
-         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4"> {/* Giảm gap-y */}
-             <InputField label="Màu sắc" name="color" value={formData.color} onChange={handleChange} />
-             <InputField label="Trọng lượng (g)" name="weight" value={formData.weight} onChange={handleChange} placeholder="VD: 220"/>
-             <InputField label="Kích thước (mm)" name="dimension" value={formData.dimension} onChange={handleChange} placeholder="VD: 161.4 x 75.3 x 8.5"/>
-             <InputField label="Loại pin" name="batteryType" value={formData.batteryType} onChange={handleChange} placeholder="VD: Li-Po"/>
-             <InputField label="Dung lượng pin (mAh)" name="batteryCapacity" value={formData.batteryCapacity} onChange={handleChange} placeholder="VD: 5000"/>
-             <InputField label="RAM (GB)" name="ramCapacity" value={formData.ramCapacity} onChange={handleChange} placeholder="VD: 16"/>
-             <InputField label="ROM (GB)" name="romCapacity" value={formData.romCapacity} onChange={handleChange} placeholder="VD: 512"/>
-             <InputField label="Kích thước màn hình (inch)" name="screenSize" value={formData.screenSize} onChange={handleChange} placeholder="VD: 6.73"/>
-             <InputField label="Cổng kết nối" name="connectionPort" value={formData.connectionPort} onChange={handleChange} placeholder="VD: USB Type-C"/>
-         </div>
-       </div>
+      {/* Additional Content */}
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold text-gray-900">Nội dung chi tiết</h3>
+        
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Đánh giá chi tiết</label>
+          <textarea
+            name="detailedReview"
+            value={formData.detailedReview}
+            onChange={handleInputChange}
+            rows={3}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+          />
+        </div>
 
-       {/* Detailed Content */}
-       <div>
-         <h2 className="text-lg font-semibold text-gray-900 mb-4">Nội dung chi tiết</h2>
-         <div className="space-y-4">
-            <TextareaField label="Đánh giá chi tiết" name="detailedReview" value={formData.detailedReview} onChange={handleChange} rows={5}/>
-            <TextareaField label="Hiệu năng mạnh mẽ" name="powerfulPerformance" value={formData.powerfulPerformance} onChange={handleChange} rows={3}/>
-         </div>
-       </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Hiệu năng mạnh mẽ</label>
+          <textarea
+            name="powerfulPerformance"
+            value={formData.powerfulPerformance}
+            onChange={handleInputChange}
+            rows={3}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+          />
+        </div>
+      </div>
 
       {/* Inventories */}
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-gray-900">Kho hàng (Biến thể)</h2>
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold text-gray-900">Kho hàng & Giá</h3>
           <button
             type="button"
-            onClick={handleAddInventory}
+            onClick={addInventory}
             className="flex items-center gap-2 text-blue-600 hover:text-blue-700 text-sm font-medium"
           >
-            <Plus size={18} />
+            <Plus size={16} />
             Thêm biến thể
           </button>
         </div>
 
-        <div className="space-y-3">
-          {(formData.inventories || []).map((inventory, index) => (
-             // Sửa: Giảm padding, thu gọn khoảng cách cột
-            <div key={inventory.id || `new-${index}`} className="grid grid-cols-4 gap-3 items-end p-3 border rounded-lg">
-                <InputField
-                    label="Kích cỡ/Loại"
-                    placeholder="VD: 256GB"
-                    value={inventory.size}
-                    onChange={(e) => handleInventoryChange(index, "size", e.target.value)}
-                    required
-                />
-                <InputField label="Số lượng" type="number" placeholder="0" value={inventory.quantity} onChange={(e) => handleInventoryChange(index, "quantity", e.target.value)} min="0" required/>
-                <InputField label="Giá gốc (VNĐ)" type="number" placeholder="0" value={inventory.price} onChange={(e) => handleInventoryChange(index, "price", e.target.value)} step="1000" min="0" required/>
-                <InputField label="Giảm giá (%)" type="number" placeholder="0" value={inventory.discountPercent} onChange={(e) => handleInventoryChange(index, "discountPercent", e.target.value)} min="0" max="100" />
-                {/* Nút Xóa đã được loại bỏ */}
-                {/*
-                <button
-                    type="button"
-                    onClick={() => handleRemoveInventory(index)}
-                    className="p-2 h-10 mt-auto hover:bg-red-100 rounded-lg transition-colors text-red-600 flex items-center justify-center sm:col-start-5" // Căn chỉnh nút xóa
-                >
-                    <Trash2 size={18} />
-                 </button>
-                 */}
+        {inventories.map((inv, index) => (
+
+          <div key={index} className="p-4 border border-gray-200 rounded-lg space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-gray-700">Biến thể #{index + 1}</span>
+              {/* Removed delete button - backend doesn't support inventory deletion */}
             </div>
-          ))}
-           {(!formData.inventories || formData.inventories.length === 0) && (
-              <p className="text-sm text-gray-500 italic">Chưa có biến thể nào.</p>
-            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  Kích cỡ <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={inv.size}
+                  onChange={(e) => updateInventory(index, 'size', e.target.value)}
+                  required
+                  placeholder="VD: 128GB"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  Số lượng <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  value={inv.quantity}
+                  onChange={(e) => updateInventory(index, 'quantity', e.target.value)}
+                  required
+                  min="0"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  Giá (VNĐ) <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  value={inv.price}
+                  onChange={(e) => updateInventory(index, 'price', e.target.value)}
+                  required
+                  min="0"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Giảm giá (%)</label>
+                <input
+                  type="number"
+                  value={inv.discountPercent}
+                  onChange={(e) => updateInventory(index, 'discountPercent', e.target.value)}
+                  min="0"
+                  max="100"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent text-sm"
+                />
+              </div>
+            </div>
+          </div>
+        ))}
+
+        {inventories.length === 0 && (
+          <p className="text-sm text-gray-500 italic text-center py-4">
+            Chưa có biến thể nào. Nhấn "Thêm biến thể" để bắt đầu.
+          </p>
+        )}
+      </div>
+
+      {/* Images */}
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold text-gray-900">Hình ảnh sản phẩm</h3>
+
+        {/* Existing Images */}
+        {isEditMode && existingImages.length > 0 && (
+          <div>
+            <p className="text-sm font-medium text-gray-700 mb-2">Ảnh hiện tại</p>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {existingImages.map(img => {
+                const markedForDeletion = imagesToDelete.includes(img.id)
+                return (
+                  <div key={img.id} className="relative group">
+                    <img
+                      src={img.downloadUrl}
+                      alt={img.fileName}
+                      className={`w-full aspect-square object-cover rounded-lg ${
+                        markedForDeletion ? 'opacity-40' : ''
+                      }`}
+                    />
+                    {markedForDeletion ? (
+                      <button
+                        type="button"
+                        onClick={() => unmarkImageForDeletion(img.id)}
+                        className="absolute top-2 right-2 p-1.5 bg-green-500 text-white rounded-full hover:bg-green-600"
+                        title="Khôi phục"
+                      >
+                        <Check size={16} />
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => markImageForDeletion(img.id)}
+                        className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                        title="Đánh dấu xóa"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    )}
+                    {markedForDeletion && (
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <span className="bg-red-500 text-white px-3 py-1 rounded-full text-xs font-medium">
+                          Sẽ xóa
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* New Images */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            {isEditMode ? 'Thêm ảnh mới' : 'Tải ảnh lên'}
+          </label>
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 rounded-lg cursor-pointer hover:bg-blue-100 transition-colors">
+              <Upload size={18} />
+              <span className="text-sm font-medium">Chọn file</span>
+              <input
+                type="file"
+                multiple
+                accept="image/*"
+                onChange={handleImageUpload}
+                className="hidden"
+              />
+            </label>
+            <span className="text-sm text-gray-500">
+              {newImageFiles.length} file đã chọn
+            </span>
+          </div>
+
+          {newImageFiles.length > 0 && (
+            <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-3">
+              {newImageFiles.map((file, index) => (
+                <div key={index} className="relative group">
+                  <img
+                    src={URL.createObjectURL(file)}
+                    alt={file.name}
+                    className="w-full aspect-square object-cover rounded-lg"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeNewImage(index)}
+                    className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Status */}
-      <div className="flex items-center gap-3">
-        <input
-          type="checkbox"
-          id="active"
-          name="active"
-          checked={formData.active}
-          onChange={handleChange}
-          className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
-        />
-        <label htmlFor="active" className="text-sm font-medium text-gray-700">
-          Đang hoạt động
-        </label>
-      </div>
-
-      {/* Submit & Cancel */}
-      <div className="flex gap-3 pt-4">
-         {onCancel && (
-            <button
-                type="button"
-                onClick={onCancel}
-                className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-2 rounded-lg transition-colors flex items-center justify-center gap-2"
-            >
-                Hủy
-            </button>
-         )}
+      {/* Form Actions */}
+      <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200">
+        <button
+          type="button"
+          onClick={onCancel || (() => navigate("/products"))}
+          disabled={loading}
+          className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          Hủy
+        </button>
         <button
           type="submit"
-          disabled={loading}
-          className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium py-2 rounded-lg transition-colors flex items-center justify-center gap-2"
+          disabled={loading || inventories.length === 0}
+          className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           {loading && <Loader size={18} className="animate-spin" />}
-          {loading ? "Đang lưu..." : initialData?.id ? "Cập nhật sản phẩm" : "Tạo sản phẩm"}
+          {isEditMode ? "Cập nhật" : "Tạo sản phẩm"}
         </button>
       </div>
     </form>
   )
 }
-
-// Helper components cho input và textarea
-// Sửa: Thêm lớp CSS `h-10` để cố định chiều cao input
-const InputField = ({ label, name, value, onChange, type = "text", placeholder = "", required = false, min, max, step }) => (
-    <div>
-      <label className="block text-xs font-medium text-gray-600 mb-1">{label}{required && <span className="text-red-500">*</span>}</label>
-      <input
-        type={type}
-        name={name}
-        value={value ?? ''}
-        onChange={onChange}
-        placeholder={placeholder}
-        required={required}
-        min={min}
-        max={max}
-        step={step}
-        // Thêm h-10 và giảm padding py-1.5
-        className="w-full h-10 px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none text-sm"
-      />
-    </div>
-  );
-
-  const TextareaField = ({ label, name, value, onChange, rows = 4, placeholder = "" }) => (
-    <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
-      <textarea
-        name={name}
-        value={value ?? ''}
-        onChange={onChange}
-        rows={rows}
-        placeholder={placeholder}
-        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none text-sm"
-      />
-    </div>
-  );
 
 export default ProductForm
