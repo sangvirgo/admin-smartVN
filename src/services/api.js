@@ -116,12 +116,6 @@ export const userService = {
    */
   getUserById: (id) => api.get(`/users/${id}`),
 
-  /**
-   * Delete user
-   * @param {number} id - User ID
-   * @returns {Promise} Delete response
-   */
-  deleteUser: (id) => api.delete(`/users/${id}`),
 
   /**
    * Ban a user

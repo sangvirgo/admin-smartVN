@@ -5,10 +5,10 @@ const OrderStatusBadge = ({ status }) => {
       text: "text-yellow-800",
       label: "Pending",
     },
-    PROCESSING: {
-      bg: "bg-blue-100",
-      text: "text-blue-800",
-      label: "Processing",
+    CONFIRMED: {
+      bg: "bg-cyan-100", // Ví dụ màu cyan
+      text: "text-cyan-800",
+      label: "Confirmed",
     },
     SHIPPED: {
       bg: "bg-purple-100",

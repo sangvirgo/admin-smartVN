@@ -1,51 +1,66 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useNavigate } from "react-router-dom"
 import { reviewService } from "../services/api"
-import { AlertCircle, Loader, Search, Eye, Star } from "lucide-react"
-import ReviewStatusBadge from "../components/ReviewStatusBadge"
+import { useAuth } from "../context/AuthContext"
+import { AlertCircle, Loader, Star, Trash2 } from "lucide-react"
 
 const ReviewsPage = () => {
   const [reviews, setReviews] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [searchTerm, setSearchTerm] = useState("")
-  const [statusFilter, setStatusFilter] = useState("ALL")
-  const [ratingFilter, setRatingFilter] = useState("ALL")
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
-  const navigate = useNavigate()
+  const [deletingId, setDeletingId] = useState(null)
+  const { isAdmin } = useAuth()
 
   const fetchReviews = async (pageNum = 1) => {
     try {
       setLoading(true)
+      setError(null) // Xóa lỗi cũ khi fetch
+      
+      // SỬA: Gọi API chỉ với phân trang
       const response = await reviewService.getReviews(
         pageNum - 1,
-        10,
-        statusFilter !== "ALL" ? statusFilter : "",
-        null,
-        null,
+        10
       )
+      
       setReviews(response.data.content || response.data.data || [])
       setTotalPages(response.data.totalPages || response.data.pagination?.totalPages || 1)
       setPage(pageNum)
     } catch (err) {
-      setError(err.response?.data?.message || "Failed to load reviews")
+      setError(err.response?.data?.message || "Không thể tải danh sách đánh giá")
       console.error("Reviews error:", err)
     } finally {
       setLoading(false)
     }
   }
 
+  // Tải dữ liệu lần đầu
   useEffect(() => {
     fetchReviews(1)
-  }, [searchTerm, statusFilter, ratingFilter])
+  }, []) // Chỉ chạy 1 lần khi component mount
 
-  const handleViewReview = (id) => {
-    navigate(`/reviews/${id}`)
+  // Hàm xử lý xóa
+  const handleDelete = async (id) => {
+    if (!window.confirm("Bạn có chắc chắn muốn xóa đánh giá này không?")) return
+
+    try {
+      setDeletingId(id)
+      setError(null)
+      await reviewService.deleteReview(id)
+      
+      // Tải lại trang hiện tại
+      // Nếu xóa item cuối cùng của trang, cần xử lý lùi trang (tạm thời fetch lại trang hiện tại)
+      fetchReviews(page) 
+    } catch (err) {
+      setError(err.response?.data?.message || "Xóa đánh giá thất bại")
+    } finally {
+      setDeletingId(null)
+    }
   }
 
+  // Hàm render sao
   const renderStars = (rating) => {
     return (
       <div className="flex gap-1">
@@ -55,14 +70,31 @@ const ReviewsPage = () => {
       </div>
     )
   }
+  
+  // Hàm format ngày
+  const formatDate = (dateString) => {
+    if (!dateString) return "N/A"
+    try {
+      return new Date(dateString).toLocaleString("vi-VN", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    } catch (e) {
+      return "Invalid Date"
+    }
+  }
 
-  if (error && !loading) {
+  // Giao diện khi có lỗi
+  if (error && !loading && reviews.length === 0) {
     return (
       <div className="p-6">
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex gap-3">
           <AlertCircle size={20} className="text-red-600 flex-shrink-0" />
           <div>
-            <h3 className="font-medium text-red-900">Error Loading Reviews</h3>
+            <h3 className="font-medium text-red-900">Lỗi khi tải đánh giá</h3>
             <p className="text-red-700 text-sm mt-1">{error}</p>
           </div>
         </div>
@@ -75,132 +107,108 @@ const ReviewsPage = () => {
       {/* Page Header */}
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Reviews</h1>
-        <p className="text-gray-600 mt-1">Manage and moderate customer reviews</p>
+        <p className="text-gray-600 mt-1">Quản lý và kiểm duyệt đánh giá của khách hàng</p>
       </div>
 
-      {/* Filters */}
-      <div className="bg-white rounded-lg shadow p-4 space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="relative">
-            <Search size={18} className="absolute left-3 top-3 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search by product or reviewer..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none"
-            />
-          </div>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none"
-          >
-            <option value="ALL">All Statuses</option>
-            <option value="PENDING">Pending</option>
-            <option value="APPROVED">Approved</option>
-            <option value="REJECTED">Rejected</option>
-          </select>
-          <select
-            value={ratingFilter}
-            onChange={(e) => setRatingFilter(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none"
-          >
-            <option value="ALL">All Ratings</option>
-            <option value="5">5 Stars</option>
-            <option value="4">4 Stars</option>
-            <option value="3">3 Stars</option>
-            <option value="2">2 Stars</option>
-            <option value="1">1 Star</option>
-          </select>
-        </div>
-      </div>
+      {/* Hiển thị lỗi (nếu có lỗi nhưng vẫn còn data cũ) */}
+      {error && (
+         <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex gap-3">
+           <AlertCircle size={20} className="text-red-600 flex-shrink-0" />
+           <p className="text-red-700 text-sm">{error}</p>
+         </div>
+       )}
 
-      {/* Reviews Table */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        {loading ? (
+      {/* Danh sách Reviews */}
+      <div className="space-y-4">
+        {loading && reviews.length === 0 ? (
           <div className="flex items-center justify-center h-64">
             <Loader size={24} className="animate-spin text-blue-600" />
+            <p className="ml-2 text-gray-600">Đang tải đánh giá...</p>
           </div>
         ) : reviews.length === 0 ? (
-          <div className="p-8 text-center">
-            <p className="text-gray-500">No reviews found</p>
+          <div className="p-8 text-center bg-white rounded-lg shadow">
+            <p className="text-gray-500">Không tìm thấy đánh giá nào.</p>
           </div>
         ) : (
-          <>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Product</th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Reviewer</th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Rating</th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Comment</th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Status</th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Date</th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {reviews.map((review) => (
-                    <tr key={review.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4 text-sm font-medium text-gray-900">{review.productName}</td>
-                      <td className="px-6 py-4 text-sm text-gray-600">
-                        <div>
-                          <p className="font-medium">{review.reviewerName}</p>
-                          <p className="text-xs text-gray-500">{review.reviewerEmail}</p>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-sm">{renderStars(review.rating)}</td>
-                      <td className="px-6 py-4 text-sm text-gray-600">
-                        <p className="line-clamp-2">{review.comment}</p>
-                      </td>
-                      <td className="px-6 py-4 text-sm">
-                        <ReviewStatusBadge status={review.status} />
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-600">
-                        {new Date(review.createdAt).toLocaleDateString()}
-                      </td>
-                      <td className="px-6 py-4 text-sm">
-                        <button
-                          onClick={() => handleViewReview(review.id)}
-                          className="flex items-center gap-2 text-blue-600 hover:text-blue-700 font-medium"
-                        >
-                          <Eye size={18} />
-                          View
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+          <div className="bg-white rounded-lg shadow overflow-hidden">
+            <ul className="divide-y divide-gray-200">
+              {reviews.map((review) => (
+                <li key={review.id} className="p-4 sm:p-6 hover:bg-gray-50 transition-colors">
+                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between">
+                    {/* Thông tin chính */}
+                    <div className="flex-1 min-w-0">
+                      {/* Tên sản phẩm */}
+                      <p className="text-sm font-semibold text-blue-600">{review.productTitle}</p>
+                      
+                      {/* Đánh giá (sao + nội dung) */}
+                      <div className="flex items-center gap-2 mt-1">
+                        {renderStars(review.rating)}
+                        <span className="text-sm font-medium text-gray-800">({review.rating}/5)</span>
+                      </div>
+                      <p className="text-gray-800 mt-2 text-base leading-relaxed">{review.reviewContent}</p>
+                    </div>
 
+                    {/* Nút Xóa (dành cho Admin) */}
+                    {isAdmin && (
+                      <div className="mt-4 sm:mt-0 sm:ml-6 flex-shrink-0">
+                        <button
+                          onClick={() => handleDelete(review.id)}
+                          disabled={deletingId === review.id}
+                          className="flex items-center justify-center gap-2 w-full sm:w-auto px-3 py-2 text-sm font-medium text-red-600 bg-red-100 hover:bg-red-200 rounded-lg transition-colors disabled:opacity-50"
+                        >
+                          {deletingId === review.id ? (
+                            <Loader size={16} className="animate-spin" />
+                          ) : (
+                            <Trash2 size={16} />
+                          )}
+                          Xóa
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Thông tin phụ (Người dùng, Ngày) */}
+                  <div className="mt-4 pt-4 border-t border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between text-sm text-gray-500">
+                    <div>
+                      <p className="font-medium">{review.userName}</p>
+                      <p>{review.userEmail}</p>
+                    </div>
+                    <div className="mt-2 sm:mt-0 sm:text-right">
+                      <p>Ngày tạo: {formatDate(review.createdAt)}</p>
+                      {review.updatedAt !== review.createdAt && (
+                         <p>Cập nhật: {formatDate(review.updatedAt)}</p>
+                      )}
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+            
             {/* Pagination */}
             {totalPages > 1 && (
               <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
                 <p className="text-sm text-gray-600">
-                  Page {page} of {totalPages}
+                  Trang {page} / {totalPages}
                 </p>
                 <div className="flex gap-2">
                   <button
                     onClick={() => fetchReviews(page - 1)}
-                    disabled={page === 1}
-                    className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                    disabled={page === 1 || loading}
+                    className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
-                    Previous
+                    Trước
                   </button>
                   <button
                     onClick={() => fetchReviews(page + 1)}
-                    disabled={page === totalPages}
-                    className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                    disabled={page === totalPages || loading}
+                    className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
-                    Next
+                    Sau
                   </button>
                 </div>
               </div>
             )}
-          </>
+          </div>
         )}
       </div>
     </div>
