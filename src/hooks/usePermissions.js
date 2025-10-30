@@ -4,34 +4,39 @@ import { useAuth } from "../context/AuthContext"
 export const usePermissions = () => {
   const { isAdmin, isStaff } = useAuth()
 
-  // Ánh xạ quyền dựa trên SecurityConfig và logic nghiệp vụ
   const permissions = {
-    // Users (Chỉ Admin)
-    canViewUsers: isAdmin,
-    canBanUsers: isAdmin,
-    canWarnUsers: isAdmin,
-    canUnbanUsers: isAdmin,
+    // Users - CHỈ ADMIN
+    canViewUsers: isAdmin || isStaff, // STAFF có thể xem danh sách
+    canBanUsers: isAdmin, // CHỈ ADMIN
+    canWarnUsers: isAdmin, // CHỈ ADMIN
+    canUnbanUsers: isAdmin, // CHỈ ADMIN
+    canChangeUserRole: isAdmin, // CHỈ ADMIN - THÊM MỚI
     
     // Products
     canCreateProduct: isAdmin,
-    canEditProduct: isAdmin, // Quyền chung để sửa (gồm cả toggle active)
-    canDeleteProduct: isAdmin, // Giả định chỉ Admin được xóa (theo logic frontend cũ)
+    canEditProduct: isAdmin,
+    canDeleteProduct: isAdmin,
+    canToggleProductActive: isAdmin, // THÊM MỚI - riêng cho toggle active
     canUploadProductImages: isAdmin,
     canDeleteProductImages: isAdmin,
     canViewProducts: isAdmin || isStaff,
-    canManageInventory: isAdmin || isStaff,
+    
+    // Inventory - CẢ ADMIN VÀ STAFF
+    canManageInventory: isAdmin || isStaff, // THÊM MỚI - quyền chung
+    canAddInventory: isAdmin || isStaff, // THÊM MỚI
+    canUpdateInventory: isAdmin || isStaff, // THÊM MỚI
     
     // Orders
     canViewOrders: isAdmin || isStaff,
-    canUpdateOrders: isAdmin || isStaff, // Cả 2 đều được cập nhật trạng thái
-    canViewOrderStats: isAdmin, // Chỉ Admin xem thống kê
+    canUpdateOrders: isAdmin || isStaff,
+    canViewOrderStats: isAdmin,
     
     // Reviews
     canDeleteReviews: isAdmin,
     canViewReviews: isAdmin || isStaff,
     
     // Dashboard
-    canViewDashboard: isAdmin, // Chỉ Admin xem dashboard
+    canViewDashboard: isAdmin,
   }
 
   return permissions

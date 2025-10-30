@@ -3,7 +3,7 @@ import { CheckCircle, XCircle } from "lucide-react"
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { productService } from "../services/api"
-import { AlertCircle, Loader, Plus, Search, Trash2, Edit2, Star, ImageOff } from "lucide-react"
+import { AlertCircle, Loader, Plus, Search, Trash2, Edit2, Star, ImageOff, Package } from "lucide-react"
 // SỬA: Bỏ useAuth, thêm usePermissions và PermissionWrapper
 import { usePermissions } from "../hooks/usePermissions"
 import PermissionWrapper from "../components/PermissionWrapper"
@@ -344,10 +344,15 @@ const ProductsPage = () => {
                               </button>
                             </PermissionWrapper>
                             
-                            {/* Fallback cho Staff */}
-                            {!permissions.canEditProduct && !permissions.canDeleteProduct && (
-                               <span className="text-xs text-gray-400 italic">N/A</span>
-                            )}
+                            <PermissionWrapper permission="canManageInventory">
+                              <button
+                                onClick={() => handleEdit(product.id)}
+                                className="p-1 text-indigo-600 hover:text-indigo-800 hover:bg-indigo-100 rounded transition-colors"
+                                title="Quản lý kho hàng"
+                              >
+                                <Package size={18} />
+                              </button>
+                            </PermissionWrapper>
                         </div>
                       </td>
 
