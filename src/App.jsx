@@ -1,3 +1,5 @@
+// src/App.jsx
+
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom"
 import { AuthProvider } from "./context/AuthContext"
 import PrivateRoute from "./components/PrivateRoute"
@@ -13,6 +15,9 @@ import OrdersPage from "./pages/OrdersPage"
 import OrderDetailPage from "./pages/OrderDetailPage"
 import ReviewsPage from "./pages/ReviewsPage"
 
+// (MỚI) Import trang không có quyền
+import UnauthorizedPage from "./pages/UnauthorizedPage"
+
 function App() {
   return (
     <Router>
@@ -20,7 +25,12 @@ function App() {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
 
+          {/* (MỚI) Thêm route cho trang không có quyền */}
+          {/* Route này phải nằm ngoài <PrivateRoute> */}
+          <Route path="/unauthorized" element={<UnauthorizedPage />} />
+
           {/* Protected routes */}
+          {/* PrivateRoute giờ sẽ tự động lọc vai trò CUSTOMER */}
           <Route element={<PrivateRoute />}>
             <Route element={<Layout />}>
               <Route path="/dashboard" element={<DashboardPage />} />

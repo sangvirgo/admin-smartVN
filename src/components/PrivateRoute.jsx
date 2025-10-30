@@ -1,10 +1,13 @@
+// src/components/PrivateRoute.jsx
+
 "use client"
 
 import { Navigate, Outlet } from "react-router-dom"
 import { useAuth } from "../context/AuthContext"
 
 const PrivateRoute = () => {
-  const { isAuthenticated, loading } = useAuth()
+  // Lấy thêm isAdmin và isStaff từ context
+  const { isAuthenticated, loading, isAdmin, isStaff } = useAuth()
 
   if (loading) {
     return (
@@ -17,7 +20,19 @@ const PrivateRoute = () => {
     )
   }
 
-  return isAuthenticated ? <Outlet /> : <Navigate to="/login" replace />
+  // 1. Kiểm tra xem người dùng đã đăng nhập chưa
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />
+  }
+
+  // 2. Kiểm tra xem người dùng có phải là ADMIN hoặc STAFF không
+  // (CUSTOMER sẽ thất bại ở đây)
+  if (!isAdmin && !isStaff) {
+    return <Navigate to="/unauthorized" replace />
+  }
+
+  // 3. Nếu đã đăng nhập VÀ là Admin/Staff, cho phép truy cập
+  return <Outlet />
 }
 
 export default PrivateRoute
