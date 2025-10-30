@@ -1,11 +1,13 @@
 "use client"
 
 import { useEffect, useState } from "react"
+// SỬA: Thêm Navigate
+import { Navigate } from "react-router-dom" 
 import { dashboardService } from "../services/api"
 import StatCard from "../components/StatCard"
 import RevenueChart from "../components/RevenueChart"
-// import RecentOrders from "../components/RecentOrders" // ĐÃ XÓA
-// import RecentReviews from "../components/RecentReviews" // ĐÃ XÓA
+// SỬA: Thêm usePermissions
+import { usePermissions } from "../hooks/usePermissions"
 import {
   AlertCircle,
   Loader,
@@ -14,15 +16,15 @@ import {
   ShoppingCart,
   DollarSign,
   Filter,
-  Clock, // Thêm icon
-  CheckCircle, // Thêm icon
-  XCircle, // Thêm icon
-  Truck, // Thêm icon
-  PackageCheck, // Thêm icon
-  UserPlus, // Thêm icon
-  Wallet, // Thêm icon
-  Archive, // Thêm icon
-  CalendarCheck, // Thêm icon
+  Clock, 
+  CheckCircle,
+  XCircle, 
+  Truck, 
+  PackageCheck, 
+  UserPlus, 
+  Wallet, 
+  Archive, 
+  CalendarCheck, 
 } from "lucide-react"
 
 // --- Tiện ích (Giữ nguyên) ---
@@ -82,6 +84,15 @@ const DashboardPage = () => {
   const [loadingStats, setLoadingStats] = useState(true)
   const [loadingChart, setLoadingChart] = useState(true)
   const [error, setError] = useState(null)
+
+  // SỬA: Lấy permissions
+  const permissions = usePermissions()
+
+  // SỬA: Thêm kiểm tra quyền truy cập
+  if (!permissions.canViewDashboard) {
+    // Nếu không phải Admin, điều hướng về trang Products
+    return <Navigate to="/products" replace />
+  }
 
   // Hàm tải dữ liệu tổng quan (chạy 1 lần)
   useEffect(() => {

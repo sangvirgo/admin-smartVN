@@ -1,13 +1,19 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useNavigate } from "react-router-dom"
+// SỬA: Thêm Navigate
+import { useNavigate, Navigate } from "react-router-dom"
 import { productService } from "../services/api"
+// SỬA: Thêm usePermissions
+import { usePermissions } from "../hooks/usePermissions" 
 import { ArrowLeft, AlertCircle, Loader, Plus, X, Upload } from "lucide-react"
 
 const CreateProductPage = () => {
   const navigate = useNavigate()
   
+  // SỬA: Lấy permissions
+  const permissions = usePermissions()
+
   // Form states
   const [formData, setFormData] = useState({
     title: "",
@@ -37,6 +43,11 @@ const CreateProductPage = () => {
   const [loading, setLoading] = useState(false)
   const [uploadingImages, setUploadingImages] = useState(false)
   const [createdProductId, setCreatedProductId] = useState(null)
+
+  // SỬA: Thêm kiểm tra quyền
+  if (!permissions.canCreateProduct) {
+    return <Navigate to="/products" replace />
+  }
 
   // Fetch categories on mount
   useEffect(() => {

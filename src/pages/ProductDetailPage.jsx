@@ -4,7 +4,9 @@ import { useEffect, useState } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import { productService } from "../services/api"
 import ProductForm from "../components/ProductForm" // Import form
-import { AlertCircle, Loader, ArrowLeft, Edit, Star, ImageOff, CheckCircle, XCircle } from "lucide-react" // Thêm Edit icon
+import { AlertCircle, Loader, ArrowLeft, Edit, Star, ImageOff, CheckCircle, XCircle } from "lucide-react" 
+// SỬA: Thêm usePermissions
+import { usePermissions } from "../hooks/usePermissions"
 
 // --- Tiện ích --- (Copy từ ProductsPage nếu cần)
 const formatCurrency = (value) => {
@@ -39,7 +41,10 @@ const ProductDetailPage = () => {
   const [product, setProduct] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [isEditing, setIsEditing] = useState(false); // State để quản lý chế độ xem/sửa
+  const [isEditing, setIsEditing] = useState(false); 
+  
+  // SỬA: Lấy permissions
+  const permissions = usePermissions()
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -139,8 +144,9 @@ const ProductDetailPage = () => {
             </p>
             </div>
         </div>
-        {/* SỬA: Nút Edit/Cancel */}
-        {!isEditing ? (
+        
+        {/* SỬA: Dùng permissions.canEditProduct và logic hiển thị nút Hủy */}
+        {permissions.canEditProduct && !isEditing ? (
             <button
             onClick={() => setIsEditing(true)}
             className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg transition-colors text-sm font-medium"
@@ -149,18 +155,20 @@ const ProductDetailPage = () => {
             Chỉnh sửa
             </button>
         ) : (
-             <button
-                onClick={() => setIsEditing(false)} // Nút hủy khi đang edit
-                className="flex items-center gap-2 bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors text-sm font-medium"
-             >
-                <XCircle size={18} />
-                Hủy bỏ
-             </button>
+             isEditing && ( // Chỉ hiển thị nút Hủy khi đang ở chế độ sửa
+                 <button
+                    onClick={() => setIsEditing(false)} 
+                    className="flex items-center gap-2 bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors text-sm font-medium"
+                 >
+                    <XCircle size={18} />
+                    Hủy bỏ
+                 </button>
+             )
         )}
       </div>
 
       {/* SỬA: Hiển thị Form hoặc Chi tiết */}
-      {isEditing ? (
+      {isEditing && permissions.canEditProduct ? ( // Thêm kiểm tra quyền ở đây
         // Chế độ chỉnh sửa
         <div className="max-w-4xl mx-auto"> {/* Căn giữa form */}
           <ProductForm

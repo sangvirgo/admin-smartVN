@@ -1,7 +1,7 @@
 // src/App.jsx
 
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom"
-import { AuthProvider } from "./context/AuthContext"
+import { AuthProvider, useAuth } from "./context/AuthContext" // SỬA: Thêm useAuth
 import PrivateRoute from "./components/PrivateRoute"
 import Layout from "./components/Layout"
 import LoginPage from "./pages/LoginPage"
@@ -18,6 +18,25 @@ import ReviewsPage from "./pages/ReviewsPage"
 // (MỚI) Import trang không có quyền
 import UnauthorizedPage from "./pages/UnauthorizedPage"
 
+// THÊM: Component redirect thông minh
+const SmartRedirect = () => {
+  const { isAdmin, isAuthenticated, loading } = useAuth()
+
+  // Nếu đang kiểm tra auth, không render gì cả
+  if (loading) {
+    return null; 
+  }
+
+  // Nếu chưa đăng nhập, PrivateRoute sẽ xử lý, nhưng đây là fallback
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />
+  }
+
+  // Nếu đã đăng nhập, điều hướng theo vai trò
+  return <Navigate to={isAdmin ? "/dashboard" : "/products"} replace />
+}
+
+
 function App() {
   return (
     <Router>
@@ -25,12 +44,9 @@ function App() {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
 
-          {/* (MỚI) Thêm route cho trang không có quyền */}
-          {/* Route này phải nằm ngoài <PrivateRoute> */}
           <Route path="/unauthorized" element={<UnauthorizedPage />} />
 
           {/* Protected routes */}
-          {/* PrivateRoute giờ sẽ tự động lọc vai trò CUSTOMER */}
           <Route element={<PrivateRoute />}>
             <Route element={<Layout />}>
               <Route path="/dashboard" element={<DashboardPage />} />
@@ -45,7 +61,8 @@ function App() {
             </Route>
           </Route>
 
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          {/* SỬA: Thay thế redirect cũ bằng SmartRedirect */}
+          <Route path="/" element={<SmartRedirect />} />
         </Routes>
       </AuthProvider>
     </Router>

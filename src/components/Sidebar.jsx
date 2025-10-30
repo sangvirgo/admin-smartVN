@@ -1,50 +1,51 @@
 "use client"
 
 import { Link, useLocation } from "react-router-dom"
-import { useAuth } from "../context/AuthContext"
+// SỬA: Bỏ useAuth, thay bằng usePermissions
+import { usePermissions } from "../hooks/usePermissions"
 import { LayoutDashboard, Users, Package, ShoppingCart, MessageSquare, ChevronLeft, ChevronRight } from "lucide-react"
 
 const Sidebar = ({ isOpen }) => {
-  const { isAdmin } = useAuth()
+  // SỬA: Lấy permissions
+  const permissions = usePermissions()
   const location = useLocation()
 
+  // SỬA: Dùng cờ 'show' từ permissions
   const menuItems = [
     {
       label: "Dashboard",
       path: "/dashboard",
       icon: LayoutDashboard,
-      roles: ["ADMIN", "STAFF"],
+      show: permissions.canViewDashboard,
     },
     {
       label: "Users",
       path: "/users",
       icon: Users,
-      roles: ["ADMIN"],
+      show: permissions.canViewUsers,
     },
     {
       label: "Products",
       path: "/products",
       icon: Package,
-      roles: ["ADMIN", "STAFF"],
+      show: permissions.canViewProducts,
     },
     {
       label: "Orders",
       path: "/orders",
       icon: ShoppingCart,
-      roles: ["ADMIN", "STAFF"],
+      show: permissions.canViewOrders,
     },
     {
       label: "Reviews",
       path: "/reviews",
       icon: MessageSquare,
-      roles: ["ADMIN", "STAFF"],
+      show: permissions.canViewReviews,
     },
   ]
 
-  const visibleMenuItems = menuItems.filter((item) => {
-    if (isAdmin) return true
-    return item.roles.includes("STAFF")
-  })
+  // SỬA: Lọc dựa trên cờ 'show'
+  const visibleMenuItems = menuItems.filter((item) => item.show)
 
   const isActive = (path) => location.pathname === path
 

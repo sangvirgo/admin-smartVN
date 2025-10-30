@@ -2,10 +2,11 @@
 import { CheckCircle, XCircle } from "lucide-react"
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
-// SỬA: Import cả getCategories
 import { productService } from "../services/api"
 import { AlertCircle, Loader, Plus, Search, Trash2, Edit2, Star, ImageOff } from "lucide-react"
-import { useAuth } from "../context/AuthContext"
+// SỬA: Bỏ useAuth, thêm usePermissions và PermissionWrapper
+import { usePermissions } from "../hooks/usePermissions"
+import PermissionWrapper from "../components/PermissionWrapper"
 
 // --- Tiện ích --- (Giữ nguyên các hàm formatCurrency, formatDate, renderStars)
 const formatCurrency = (value) => {
@@ -50,36 +51,34 @@ const ProductsPage = () => {
   const [error, setError] = useState(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [categoryFilter, setCategoryFilter] = useState("ALL")
-  // SỬA: Thêm state cho categories và activeFilter
   const [categories, setCategories] = useState([])
-  const [activeFilter, setActiveFilter] = useState("ALL") // "ALL", "ACTIVE", "INACTIVE"
+  const [activeFilter, setActiveFilter] = useState("ALL") 
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [deleting, setDeleting] = useState(null)
   const navigate = useNavigate()
-  const { isAdmin } = useAuth()
+  // SỬA: Lấy permissions
+  const permissions = usePermissions()
 
-  // SỬA: Hàm fetch categories
+  // SỬA: Hàm fetch categories (Giữ nguyên)
   const fetchCategories = async () => {
     try {
       const response = await productService.getCategories()
-      // Giả định response.data.data là mảng categories từ API của bạn
       setCategories(response.data?.data || [])
       console.log('Categories', response.data?.data || [])
     } catch (err) {
       console.error("Failed to load categories:", err)
       setError("Không thể tải danh mục sản phẩm.")
-      setCategories([]) // Set mảng rỗng nếu lỗi
+      setCategories([]) 
     }
   }
 
-  // SỬA: Hàm fetch products để nhận thêm activeFilter
+  // SỬA: Hàm fetch products (Giữ nguyên)
   const fetchProducts = async (pageNum = 1) => {
     try {
       setLoading(true)
       setError(null)
 
-      // Xử lý giá trị boolean cho isActive
       let isActiveParam = null
       if (activeFilter === "ACTIVE") {
         isActiveParam = true
@@ -91,8 +90,8 @@ const ProductsPage = () => {
         pageNum - 1,
         10,
         searchTerm,
-        categoryFilter !== "ALL" ? categoryFilter : null, // Gửi categoryId dạng số
-        isActiveParam, // Gửi true/false/null
+        categoryFilter !== "ALL" ? categoryFilter : null, 
+        isActiveParam, 
       )
 
       const productData = response.data?.content || response.data?.data || []
@@ -170,7 +169,8 @@ const ProductsPage = () => {
           <h1 className="text-3xl font-bold text-gray-900">Sản phẩm</h1>
           <p className="text-gray-600 mt-1">Quản lý danh mục sản phẩm của bạn</p>
         </div>
-        {isAdmin && (
+        {/* SỬA: Dùng PermissionWrapper */}
+        <PermissionWrapper permission="canCreateProduct">
           <button
             onClick={() => navigate("/products/create")}
             className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
@@ -178,7 +178,7 @@ const ProductsPage = () => {
             <Plus size={20} />
             Thêm sản phẩm
           </button>
-        )}
+        </PermissionWrapper>
       </div>
 
       {/* Thông báo lỗi (giữ nguyên) */}
@@ -189,11 +189,9 @@ const ProductsPage = () => {
          </div>
        )}
 
-      {/* Filters */}
+      {/* Filters (giữ nguyên) */}
       <div className="bg-white rounded-lg shadow p-4 space-y-4">
-        {/* SỬA: grid-cols-3 để thêm bộ lọc trạng thái */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Search Input (giữ nguyên) */}
           <div className="relative">
             <Search size={18} className="absolute left-3 top-3 text-gray-400" />
             <input
@@ -204,25 +202,19 @@ const ProductsPage = () => {
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none"
             />
           </div>
-
-          {/* SỬA: Category Filter - Lấy dữ liệu động */}
           <select
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
             className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none"
-            disabled={categories.length === 0} // Disable nếu chưa load xong categories
+            disabled={categories.length === 0} 
           >
             <option value="ALL">Tất cả danh mục</option>
-            {/* Lặp qua danh sách categories */}
             {categories.map((category) => (
-              // Sử dụng categoryId làm value
               <option key={category.categoryId} value={category.categoryId}>
                 {category.name}
               </option>
             ))}
           </select>
-
-          {/* SỬA: Thêm Active Filter */}
           <select
             value={activeFilter}
             onChange={(e) => setActiveFilter(e.target.value)}
@@ -235,7 +227,7 @@ const ProductsPage = () => {
         </div>
       </div>
 
-      {/* Products Table (giữ nguyên cấu trúc HTML, chỉ sửa nội dung bên trong) */}
+      {/* Products Table */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center h-64">
@@ -266,7 +258,6 @@ const ProductsPage = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {/* Giữ nguyên map và các td, đảm bảo truy cập đúng thuộc tính */}
                    {products.map((product) => (
                     <tr key={product.id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -301,7 +292,6 @@ const ProductsPage = () => {
                         </div>
                        </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        {/* SỬA: Dùng product.active */}
                         <span
                           className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
                             product.active ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
@@ -313,10 +303,10 @@ const ProductsPage = () => {
                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{formatDate(product.createdAt)}</td>
 
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        {/* SỬA: Dùng PermissionWrapper */}
                         <div className="flex items-center gap-2">
-                          {isAdmin && (
-                            <>
-                              {/* Toggle Active Button */}
+                            {/* Quyền sửa sản phẩm (gồm toggle) */}
+                            <PermissionWrapper permission="canEditProduct">
                               <button
                                 onClick={() => handleToggleActive(product.id, product.active)}
                                 className={`p-1 rounded transition-colors ${
@@ -329,7 +319,6 @@ const ProductsPage = () => {
                                 {product.active ? <XCircle size={18} /> : <CheckCircle size={18} />}
                               </button>
 
-                              {/* Edit Button */}
                               <button
                                 onClick={() => handleEdit(product.id)}
                                 className="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-100 rounded transition-colors"
@@ -337,8 +326,10 @@ const ProductsPage = () => {
                               >
                                 <Edit2 size={18} />
                               </button>
-
-                              {/* Delete Button */}
+                            </PermissionWrapper>
+                            
+                            {/* Quyền xóa sản phẩm */}
+                            <PermissionWrapper permission="canDeleteProduct">
                               <button
                                 onClick={() => handleDelete(product.id)}
                                 disabled={deleting === product.id}
@@ -351,9 +342,12 @@ const ProductsPage = () => {
                                   <Trash2 size={18} />
                                 )}
                               </button>
-                            </>
-                          )}
-                          {!isAdmin && <span className="text-xs text-gray-400 italic">N/A</span>}
+                            </PermissionWrapper>
+                            
+                            {/* Fallback cho Staff */}
+                            {!permissions.canEditProduct && !permissions.canDeleteProduct && (
+                               <span className="text-xs text-gray-400 italic">N/A</span>
+                            )}
                         </div>
                       </td>
 

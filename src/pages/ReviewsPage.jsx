@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react"
 import { reviewService } from "../services/api"
-import { useAuth } from "../context/AuthContext"
+// SỬA: Bỏ useAuth, thêm usePermissions và PermissionWrapper
+import { usePermissions } from "../hooks/usePermissions"
+import PermissionWrapper from "../components/PermissionWrapper"
 import { AlertCircle, Loader, Star, Trash2 } from "lucide-react"
 
 const ReviewsPage = () => {
@@ -12,14 +14,15 @@ const ReviewsPage = () => {
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [deletingId, setDeletingId] = useState(null)
-  const { isAdmin } = useAuth()
+  
+  // SỬA: Lấy permissions
+  const permissions = usePermissions()
 
   const fetchReviews = async (pageNum = 1) => {
     try {
       setLoading(true)
-      setError(null) // Xóa lỗi cũ khi fetch
+      setError(null) 
       
-      // SỬA: Gọi API chỉ với phân trang
       const response = await reviewService.getReviews(
         pageNum - 1,
         10
@@ -39,7 +42,7 @@ const ReviewsPage = () => {
   // Tải dữ liệu lần đầu
   useEffect(() => {
     fetchReviews(1)
-  }, []) // Chỉ chạy 1 lần khi component mount
+  }, []) 
 
   // Hàm xử lý xóa
   const handleDelete = async (id) => {
@@ -49,9 +52,6 @@ const ReviewsPage = () => {
       setDeletingId(id)
       setError(null)
       await reviewService.deleteReview(id)
-      
-      // Tải lại trang hiện tại
-      // Nếu xóa item cuối cùng của trang, cần xử lý lùi trang (tạm thời fetch lại trang hiện tại)
       fetchReviews(page) 
     } catch (err) {
       setError(err.response?.data?.message || "Xóa đánh giá thất bại")
@@ -148,8 +148,8 @@ const ReviewsPage = () => {
                       <p className="text-gray-800 mt-2 text-base leading-relaxed">{review.reviewContent}</p>
                     </div>
 
-                    {/* Nút Xóa (dành cho Admin) */}
-                    {isAdmin && (
+                    {/* SỬA: Dùng PermissionWrapper */}
+                    <PermissionWrapper permission="canDeleteReviews">
                       <div className="mt-4 sm:mt-0 sm:ml-6 flex-shrink-0">
                         <button
                           onClick={() => handleDelete(review.id)}
@@ -164,7 +164,8 @@ const ReviewsPage = () => {
                           Xóa
                         </button>
                       </div>
-                    )}
+                    </PermissionWrapper>
+                    
                   </div>
 
                   {/* Thông tin phụ (Người dùng, Ngày) */}
