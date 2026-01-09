@@ -358,12 +358,6 @@ const DashboardPage = () => {
         </div>
       </div>
 
-      {/* (ĐÃ XÓA) Recent Orders and Reviews */}
-      {/* <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <RecentOrders />
-        <RecentReviews />
-      </div>
-      */}
     </div>
   )
 }

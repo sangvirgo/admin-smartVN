@@ -7,6 +7,7 @@ import { AlertCircle, Loader, Plus, Search, Trash2, Edit2, Star, ImageOff, Packa
 // SỬA: Bỏ useAuth, thêm usePermissions và PermissionWrapper
 import { usePermissions } from "../hooks/usePermissions"
 import PermissionWrapper from "../components/PermissionWrapper"
+import InventoryManager from "../components/InventoryManager"
 
 // --- Tiện ích --- (Giữ nguyên các hàm formatCurrency, formatDate, renderStars)
 const formatCurrency = (value) => {
@@ -56,6 +57,7 @@ const ProductsPage = () => {
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [deleting, setDeleting] = useState(null)
+  const [selectedProduct, setSelectedProduct] = useState(null)
   const navigate = useNavigate()
   // SỬA: Lấy permissions
   const permissions = usePermissions()
@@ -71,6 +73,10 @@ const ProductsPage = () => {
       setError("Không thể tải danh mục sản phẩm.")
       setCategories([]) 
     }
+  }
+
+  const handleOpenInventory = (product) => {
+    setSelectedProduct(product)
   }
 
   // SỬA: Hàm fetch products (Giữ nguyên)
@@ -353,6 +359,17 @@ const ProductsPage = () => {
                                 <Package size={18} />
                               </button>
                             </PermissionWrapper>
+
+                                      {/* ===== THÊM NÚT QUẢN LÝ KHO CHO STAFF ===== */}
+                            <PermissionWrapper permission="canManageInventory">
+                              <button
+                                onClick={() => handleOpenInventory(product)}
+                                className="p-1 text-green-600 hover:text-green-800 hover:bg-green-100 rounded transition-colors"
+                                title="Quản lý kho hàng"
+                              >
+                                <Package size={18} />
+                              </button>
+                            </PermissionWrapper>
                         </div>
                       </td>
 
@@ -389,6 +406,18 @@ const ProductsPage = () => {
           </>
         )}
       </div>
+            {/* ===== THÊM MODAL CUỐI COMPONENT ===== */}
+      {selectedProduct && (
+        <InventoryManager
+          productId={selectedProduct.id}
+          productTitle={selectedProduct.title}
+          onClose={() => setSelectedProduct(null)}
+          onSuccess={() => {
+            fetchProducts(page) // Refresh danh sách
+            setSelectedProduct(null)
+          }}
+        />
+      )}
     </div>
   )
 }

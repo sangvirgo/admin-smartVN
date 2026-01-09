@@ -1,10 +1,10 @@
 "use client"
-
+import InventoryManager from "../components/InventoryManager"
 import { useEffect, useState } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import { productService } from "../services/api"
 import ProductForm from "../components/ProductForm" // Import form
-import { AlertCircle, Loader, ArrowLeft, Edit, Star, ImageOff, CheckCircle, XCircle } from "lucide-react" 
+import { AlertCircle, Loader, ArrowLeft, Edit, Star, ImageOff, CheckCircle, XCircle, Package } from "lucide-react" 
 // SỬA: Thêm usePermissions
 import { usePermissions } from "../hooks/usePermissions"
 
@@ -42,6 +42,7 @@ const ProductDetailPage = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [isEditing, setIsEditing] = useState(false); 
+  const [showInventoryManager, setShowInventoryManager] = useState(false)
   
   // SỬA: Lấy permissions
   const permissions = usePermissions()
@@ -80,6 +81,21 @@ const ProductDetailPage = () => {
       // Hoặc chỉ đơn giản là quay về danh sách: navigate("/products");
       navigate("/products"); // Quay về danh sách sau khi sửa thành công
   };
+
+    const handleInventorySuccess = () => {
+    // Refresh product data
+    const fetchProduct = async () => {
+      try {
+        const response = await productService.getProductById(id)
+        if (response.data?.data) {
+          setProduct(response.data.data)
+        }
+      } catch (err) {
+        console.error("Refresh error:", err)
+      }
+    }
+    fetchProduct()
+  }
 
 
   if (loading) {
@@ -144,27 +160,41 @@ const ProductDetailPage = () => {
             </p>
             </div>
         </div>
-        
-        {/* SỬA: Dùng permissions.canEditProduct và logic hiển thị nút Hủy */}
-        {permissions.canEditProduct && !isEditing ? (
+
+
+        <div className="flex items-center gap-2">
+          {/* Nút quản lý kho cho STAFF */}
+          {permissions.canManageInventory && !isEditing && (
             <button
-            onClick={() => setIsEditing(true)}
-            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg transition-colors text-sm font-medium"
+              onClick={() => setShowInventoryManager(true)}
+              className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors text-sm font-medium"
             >
-            <Edit size={18} />
-            Chỉnh sửa
+              <Package size={18} />
+              Quản lý Kho
             </button>
-        ) : (
-             isEditing && ( // Chỉ hiển thị nút Hủy khi đang ở chế độ sửa
-                 <button
-                    onClick={() => setIsEditing(false)} 
-                    className="flex items-center gap-2 bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors text-sm font-medium"
-                 >
-                    <XCircle size={18} />
-                    Hủy bỏ
-                 </button>
-             )
-        )}
+          )}
+        
+          {/* Existing edit button for ADMIN */}
+          {permissions.canEditProduct && !isEditing ? (
+            <button
+              onClick={() => setIsEditing(true)}
+              className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg transition-colors text-sm font-medium"
+            >
+              <Edit size={18} />
+              Chỉnh sửa
+            </button>
+          ) : (
+            isEditing && (
+              <button
+                onClick={() => setIsEditing(false)} 
+                className="flex items-center gap-2 bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors text-sm font-medium"
+              >
+                <XCircle size={18} />
+                Hủy bỏ
+              </button>
+            )
+          )}
+        </div>
       </div>
 
       {/* SỬA: Hiển thị Form hoặc Chi tiết */}
@@ -308,6 +338,15 @@ const ProductDetailPage = () => {
             </div>
           </div>
         </div>
+      )}
+
+        {showInventoryManager && (
+        <InventoryManager
+          productId={product.id}
+          productTitle={product.title}
+          onClose={() => setShowInventoryManager(false)}
+          onSuccess={handleInventorySuccess}
+        />
       )}
     </div>
   )
